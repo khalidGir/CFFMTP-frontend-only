@@ -90,10 +90,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   const addVehicle = async (vehicle: Omit<Vehicle, "id" | "company_id" | "created_at">) => {
     if (!userProfile) return;
-    await supabase.from("vehicles").insert({
+    const { error } = await supabase.from("vehicles").insert({
       ...vehicle,
       company_id: userProfile.company_id,
     });
+    if (error) {
+      console.error("Error adding vehicle:", error);
+      alert("Error adding vehicle: " + error.message);
+      return;
+    }
     await fetchData();
   };
 
