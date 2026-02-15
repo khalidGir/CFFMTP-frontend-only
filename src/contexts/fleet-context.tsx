@@ -51,7 +51,9 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
+    console.log("fetchData called", { companyId: userProfile?.company_id });
     if (!userProfile?.company_id) {
+      console.log("No company_id, skipping fetch");
       setVehicles([]);
       setFuelLogs([]);
       setLoading(false);
@@ -60,11 +62,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
+      console.log("Fetching vehicles for company:", userProfile.company_id);
       const { data: vehiclesData, error: vehiclesError } = await supabase
         .from("vehicles")
         .select("*")
         .eq("company_id", userProfile.company_id)
         .order("created_at", { ascending: false });
+
+      console.log("Vehicles result", { vehiclesData, vehiclesError });
 
       if (vehiclesError) throw vehiclesError;
       setVehicles(vehiclesData || []);
@@ -89,11 +94,16 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [userProfile?.company_id]);
 
   const addVehicle = async (vehicle: Omit<Vehicle, "id" | "company_id" | "created_at">) => {
-    if (!userProfile) return;
+    console.log("addVehicle called", { vehicle, userProfile: userProfile?.company_id });
+    if (!userProfile) {
+      console.error("No user profile");
+      return;
+    }
     const { error } = await supabase.from("vehicles").insert({
       ...vehicle,
       company_id: userProfile.company_id,
     });
+    console.log("Insert result", { error });
     if (error) {
       console.error("Error adding vehicle:", error);
       alert("Error adding vehicle: " + error.message);
