@@ -1,27 +1,20 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import {
-  User,
-  UserCredential,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 export interface UserProfile {
-  uid: string;
+  id: string;
   email: string;
-  companyId: string;
+  company_id: string;
   role: "admin" | "driver";
-  vehicleIds: string[];
+  vehicle_ids: string[];
 }
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   userProfile: UserProfile | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -33,68 +26,92 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-          if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
       } else {
-        setUserProfile(null);
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) throw error;
+      setUserProfile(data as UserProfile);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   };
 
   const register = async (email: string, password: string, companyName: string) => {
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = credential.user.uid;
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
 
-    const companyRef = doc(db, "companies", uid);
-    await setDoc(companyRef, {
-      name: companyName,
-      ownerId: uid,
-      createdAt: new Date().toISOString(),
-      isDemo: false,
-    });
+    if (data.user) {
+      const companyId = data.user.id;
 
-    const userProfile: UserProfile = {
-      uid,
-      email,
-      companyId: uid,
-      role: "admin",
-      vehicleIds: [],
-    };
+      await supabase.from("companies").insert({
+        id: companyId,
+        name: companyName,
+        owner_id: companyId,
+        created_at: new Date().toISOString(),
+        is_demo: false,
+      });
 
-    await setDoc(doc(db, "users", uid), userProfile);
+      await supabase.from("users").insert({
+        id: data.user.id,
+        email,
+        company_id: companyId,
+        role: "admin",
+        vehicle_ids: [],
+      });
+    }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
     setUserProfile(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, userProfile, loading, login, register, logout }}
+      value={{ user, session, userProfile, loading, login, register, logout }}
     >
       {children}
     </AuthContext.Provider>

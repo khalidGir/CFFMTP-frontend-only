@@ -18,14 +18,14 @@ export default function DashboardPage() {
       return logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
     });
 
-    const totalFuelThisMonth = thisMonthLogs.reduce((sum, log) => sum + log.litersAdded, 0);
-    const totalLossThisMonth = thisMonthLogs.reduce((sum, log) => sum + Math.max(0, log.estimatedLoss), 0);
+    const totalFuelThisMonth = thisMonthLogs.reduce((sum, log) => sum + log.liters_added, 0);
+    const totalLossThisMonth = thisMonthLogs.reduce((sum, log) => sum + Math.max(0, log.estimated_loss), 0);
 
     const vehicleStats = vehicles.map((vehicle) => {
-      const vehicleLogs = thisMonthLogs.filter((log) => log.vehicleId === vehicle.id);
-      const totalLoss = vehicleLogs.reduce((sum, log) => sum + Math.max(0, log.estimatedLoss), 0);
-      const highRisk = vehicleLogs.some((log) => log.riskStatus === "high");
-      const warning = vehicleLogs.some((log) => log.riskStatus === "warning");
+      const vehicleLogs = thisMonthLogs.filter((log) => log.vehicle_id === vehicle.id);
+      const totalLoss = vehicleLogs.reduce((sum, log) => sum + Math.max(0, log.estimated_loss), 0);
+      const highRisk = vehicleLogs.some((log) => log.risk_status === "high");
+      const warning = vehicleLogs.some((log) => log.risk_status === "warning");
       
       let riskStatus: "normal" | "warning" | "high" = "normal";
       if (highRisk) riskStatus = "high";
@@ -136,8 +136,8 @@ export default function DashboardPage() {
                         vehicle.riskStatus === "high" && "bg-red-50"
                       )}
                     >
-                      <td className="py-3 px-4 font-medium">{vehicle.plateNumber}</td>
-                      <td className="py-3 px-4">{vehicle.expectedEfficiency} km/L</td>
+                      <td className="py-3 px-4 font-medium">{vehicle.plate_number}</td>
+                      <td className="py-3 px-4">{vehicle.expected_efficiency} km/L</td>
                       <td className="py-3 px-4">
                         <span className={vehicle.totalLoss > 0 ? "text-red-600" : "text-green-600"}>
                           {formatCurrency(vehicle.totalLoss)}

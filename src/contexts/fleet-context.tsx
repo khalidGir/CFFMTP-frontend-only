@@ -1,55 +1,44 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  orderBy,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/auth-context";
 
 export interface Vehicle {
   id: string;
-  companyId: string;
-  plateNumber: string;
+  company_id: string;
+  plate_number: string;
   model: string;
-  fuelType: "Diesel" | "Gasoline" | "Electric";
-  expectedEfficiency: number;
-  createdAt: string;
+  fuel_type: "Diesel" | "Gasoline" | "Electric";
+  expected_efficiency: number;
+  created_at: string;
 }
 
 export interface FuelLog {
   id: string;
-  companyId: string;
-  vehicleId: string;
+  company_id: string;
+  vehicle_id: string;
   date: string;
-  litersAdded: number;
-  pricePerLiter: number;
+  liters_added: number;
+  price_per_liter: number;
   odometer: number;
   distance: number;
-  actualEfficiency: number;
+  actual_efficiency: number;
   deviation: number;
-  estimatedLoss: number;
-  riskStatus: "normal" | "warning" | "high";
-  lateEntry: boolean;
-  createdAt: string;
+  estimated_loss: number;
+  risk_status: "normal" | "warning" | "high";
+  late_entry: boolean;
+  created_at: string;
 }
 
 interface FleetContextType {
   vehicles: Vehicle[];
   fuelLogs: FuelLog[];
   loading: boolean;
-  addVehicle: (vehicle: Omit<Vehicle, "id" | "companyId" | "createdAt">) => Promise<void>;
+  addVehicle: (vehicle: Omit<Vehicle, "id" | "company_id" | "created_at">) => Promise<void>;
   updateVehicle: (id: string, vehicle: Partial<Vehicle>) => Promise<void>;
   deleteVehicle: (id: string) => Promise<void>;
-  addFuelLog: (log: Omit<FuelLog, "id" | "companyId" | "createdAt" | "distance" | "actualEfficiency" | "deviation" | "estimatedLoss" | "riskStatus" | "lateEntry">) => Promise<void>;
+  addFuelLog: (log: Omit<FuelLog, "id" | "company_id" | "created_at" | "distance" | "actual_efficiency" | "deviation" | "estimated_loss" | "risk_status" | "late_entry">) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -62,7 +51,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    if (!userProfile?.companyId) {
+    if (!userProfile?.company_id) {
       setVehicles([]);
       setFuelLogs([]);
       setLoading(false);
@@ -71,28 +60,23 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      const vehiclesQuery = query(
-        collection(db, "vehicles"),
-        where("companyId", "==", userProfile.companyId)
-      );
-      const vehiclesSnapshot = await getDocs(vehiclesQuery);
-      const vehiclesData = vehiclesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Vehicle[];
-      setVehicles(vehiclesData);
+      const { data: vehiclesData, error: vehiclesError } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("company_id", userProfile.company_id)
+        .order("created_at", { ascending: false });
 
-      const logsQuery = query(
-        collection(db, "fuelLogs"),
-        where("companyId", "==", userProfile.companyId),
-        orderBy("date", "desc")
-      );
-      const logsSnapshot = await getDocs(logsQuery);
-      const logsData = logsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as FuelLog[];
-      setFuelLogs(logsData);
+      if (vehiclesError) throw vehiclesError;
+      setVehicles(vehiclesData || []);
+
+      const { data: logsData, error: logsError } = await supabase
+        .from("fuel_logs")
+        .select("*")
+        .eq("company_id", userProfile.company_id)
+        .order("date", { ascending: false });
+
+      if (logsError) throw logsError;
+      setFuelLogs(logsData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -102,47 +86,46 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchData();
-  }, [userProfile?.companyId]);
+  }, [userProfile?.company_id]);
 
-  const addVehicle = async (vehicle: Omit<Vehicle, "id" | "companyId" | "createdAt">) => {
+  const addVehicle = async (vehicle: Omit<Vehicle, "id" | "company_id" | "created_at">) => {
     if (!userProfile) return;
-    await addDoc(collection(db, "vehicles"), {
+    await supabase.from("vehicles").insert({
       ...vehicle,
-      companyId: userProfile.companyId,
-      createdAt: new Date().toISOString(),
+      company_id: userProfile.company_id,
     });
     await fetchData();
   };
 
   const updateVehicle = async (id: string, vehicle: Partial<Vehicle>) => {
-    await updateDoc(doc(db, "vehicles", id), vehicle);
+    await supabase.from("vehicles").update(vehicle).eq("id", id);
     await fetchData();
   };
 
   const deleteVehicle = async (id: string) => {
-    await deleteDoc(doc(db, "vehicles", id));
+    await supabase.from("vehicles").delete().eq("id", id);
     await fetchData();
   };
 
   const addFuelLog = async (
-    log: Omit<FuelLog, "id" | "companyId" | "createdAt" | "distance" | "actualEfficiency" | "deviation" | "estimatedLoss" | "riskStatus" | "lateEntry">
+    log: Omit<FuelLog, "id" | "company_id" | "created_at" | "distance" | "actual_efficiency" | "deviation" | "estimated_loss" | "risk_status" | "late_entry">
   ) => {
     if (!userProfile) return;
 
-    const vehicle = vehicles.find((v) => v.id === log.vehicleId);
+    const vehicle = vehicles.find((v) => v.id === log.vehicle_id);
     if (!vehicle) return;
 
     const previousLog = fuelLogs
-      .filter((l) => l.vehicleId === log.vehicleId)
+      .filter((l) => l.vehicle_id === log.vehicle_id)
       .sort((a, b) => b.odometer - a.odometer)[0];
 
     const distance = previousLog ? log.odometer - previousLog.odometer : log.odometer;
-    const actualEfficiency = distance > 0 ? distance / log.litersAdded : 0;
-    const expectedFuelUsed = distance / vehicle.expectedEfficiency;
+    const actualEfficiency = distance > 0 ? distance / log.liters_added : 0;
+    const expectedFuelUsed = distance / vehicle.expected_efficiency;
     const actualFuelUsed = distance / actualEfficiency;
-    const estimatedLoss = (actualFuelUsed - expectedFuelUsed) * log.pricePerLiter;
-    const deviation = vehicle.expectedEfficiency > 0 
-      ? ((actualEfficiency - vehicle.expectedEfficiency) / vehicle.expectedEfficiency) * 100 
+    const estimatedLoss = (actualFuelUsed - expectedFuelUsed) * log.price_per_liter;
+    const deviation = vehicle.expected_efficiency > 0 
+      ? ((actualEfficiency - vehicle.expected_efficiency) / vehicle.expected_efficiency) * 100 
       : 0;
 
     const entryDate = new Date(log.date);
@@ -155,16 +138,15 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     if (deviation > 15) riskStatus = "high";
     else if (deviation > 10) riskStatus = "warning";
 
-    await addDoc(collection(db, "fuelLogs"), {
+    await supabase.from("fuel_logs").insert({
       ...log,
-      companyId: userProfile.companyId,
+      company_id: userProfile.company_id,
       distance,
-      actualEfficiency,
-      estimatedLoss,
+      actual_efficiency: actualEfficiency,
+      estimated_loss: estimatedLoss,
       deviation,
-      riskStatus,
-      lateEntry,
-      createdAt: new Date().toISOString(),
+      risk_status: riskStatus,
+      late_entry: lateEntry,
     });
     await fetchData();
   };

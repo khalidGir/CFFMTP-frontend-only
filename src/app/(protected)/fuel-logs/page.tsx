@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, X, AlertTriangle } from "lucide-react";
-import { cn, formatCurrency, isLateEntry, isAdminOnlyEntry } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 export default function FuelLogsPage() {
   const { vehicles, fuelLogs, addFuelLog, loading } = useFleet();
@@ -28,12 +28,12 @@ export default function FuelLogsPage() {
 
   const filteredLogs = useMemo(() => {
     if (selectedVehicle === "all") return fuelLogs;
-    return fuelLogs.filter((log) => log.vehicleId === selectedVehicle);
+    return fuelLogs.filter((log) => log.vehicle_id === selectedVehicle);
   }, [fuelLogs, selectedVehicle]);
 
   const getVehiclePlate = (vehicleId: string) => {
     const vehicle = vehicles.find((v) => v.id === vehicleId);
-    return vehicle?.plateNumber || "Unknown";
+    return vehicle?.plate_number || "Unknown";
   };
 
   const resetForm = () => {
@@ -56,9 +56,25 @@ export default function FuelLogsPage() {
   };
 
   const getLastOdometer = (vehicleId: string) => {
-    const vehicleLogs = fuelLogs.filter((log) => log.vehicleId === vehicleId);
+    const vehicleLogs = fuelLogs.filter((log) => log.vehicle_id === vehicleId);
     if (vehicleLogs.length === 0) return 0;
     return Math.max(...vehicleLogs.map((log) => log.odometer));
+  };
+
+  const isLateEntry = (date: string) => {
+    const entryDate = new Date(date);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - entryDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 7;
+  };
+
+  const isAdminOnlyEntry = (date: string) => {
+    const entryDate = new Date(date);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - entryDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 30;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,10 +122,10 @@ export default function FuelLogsPage() {
     }
 
     await addFuelLog({
-      vehicleId: formData.vehicleId,
+      vehicle_id: formData.vehicleId,
       date: formData.date,
-      litersAdded,
-      pricePerLiter,
+      liters_added: litersAdded,
+      price_per_liter: pricePerLiter,
       odometer,
     });
 
@@ -149,7 +165,7 @@ export default function FuelLogsPage() {
             <option value="all">All Vehicles</option>
             {vehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.plateNumber}
+                {vehicle.plate_number}
               </option>
             ))}
           </select>
@@ -179,20 +195,20 @@ export default function FuelLogsPage() {
                       key={log.id}
                       className={cn(
                         "border-b",
-                        log.riskStatus === "high" && "bg-red-50",
-                        log.lateEntry && !log.riskStatus && "bg-orange-50"
+                        log.risk_status === "high" && "bg-red-50",
+                        log.late_entry && log.risk_status !== "high" && "bg-orange-50"
                       )}
                     >
-                      <td className="py-3 px-4 font-medium">{getVehiclePlate(log.vehicleId)}</td>
+                      <td className="py-3 px-4 font-medium">{getVehiclePlate(log.vehicle_id)}</td>
                       <td className="py-3 px-4">
                         {new Date(log.date).toLocaleDateString("en-GB")}
-                        {log.lateEntry && (
+                        {log.late_entry && (
                           <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
                             Late Entry
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4">{log.litersAdded.toFixed(1)} L</td>
+                      <td className="py-3 px-4">{log.liters_added.toFixed(1)} L</td>
                       <td className="py-3 px-4">{log.distance.toFixed(0)} km</td>
                       <td className="py-3 px-4">
                         <span
@@ -206,22 +222,22 @@ export default function FuelLogsPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={log.estimatedLoss > 0 ? "text-red-600" : "text-green-600"}>
-                          {formatCurrency(log.estimatedLoss)}
+                        <span className={log.estimated_loss > 0 ? "text-red-600" : "text-green-600"}>
+                          {formatCurrency(log.estimated_loss)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <span
                           className={cn(
                             "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
-                            log.riskStatus === "high" && "bg-red-100 text-red-700",
-                            log.riskStatus === "warning" && "bg-yellow-100 text-yellow-700",
-                            log.riskStatus === "normal" && "bg-green-100 text-green-700"
+                            log.risk_status === "high" && "bg-red-100 text-red-700",
+                            log.risk_status === "warning" && "bg-yellow-100 text-yellow-700",
+                            log.risk_status === "normal" && "bg-green-100 text-green-700"
                           )}
                         >
-                          {log.riskStatus === "high" && "High Risk"}
-                          {log.riskStatus === "warning" && "Warning"}
-                          {log.riskStatus === "normal" && "Normal"}
+                          {log.risk_status === "high" && "High Risk"}
+                          {log.risk_status === "warning" && "Warning"}
+                          {log.risk_status === "normal" && "Normal"}
                         </span>
                       </td>
                     </tr>
@@ -263,7 +279,7 @@ export default function FuelLogsPage() {
                   <option value="">Select vehicle</option>
                   {vehicles.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.plateNumber} - {vehicle.model}
+                      {vehicle.plate_number} - {vehicle.model}
                     </option>
                   ))}
                 </select>

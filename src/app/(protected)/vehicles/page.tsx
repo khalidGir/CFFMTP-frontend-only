@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const fuelTypes = ["Diesel", "Gasoline", "Electric"] as const;
 
@@ -42,10 +41,10 @@ export default function VehiclesPage() {
   const openEditModal = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
     setFormData({
-      plateNumber: vehicle.plateNumber,
+      plateNumber: vehicle.plate_number,
       model: vehicle.model,
-      fuelType: vehicle.fuelType,
-      expectedEfficiency: vehicle.expectedEfficiency.toString(),
+      fuelType: vehicle.fuel_type,
+      expectedEfficiency: vehicle.expected_efficiency.toString(),
     });
     setIsModalOpen(true);
   };
@@ -61,17 +60,17 @@ export default function VehiclesPage() {
 
     if (editingVehicle) {
       await updateVehicle(editingVehicle.id, {
-        plateNumber: formData.plateNumber,
+        plate_number: formData.plateNumber,
         model: formData.model,
-        fuelType: formData.fuelType,
-        expectedEfficiency: efficiency,
+        fuel_type: formData.fuelType,
+        expected_efficiency: efficiency,
       });
     } else {
       await addVehicle({
-        plateNumber: formData.plateNumber,
+        plate_number: formData.plateNumber,
         model: formData.model,
-        fuelType: formData.fuelType,
-        expectedEfficiency: efficiency,
+        fuel_type: formData.fuelType,
+        expected_efficiency: efficiency,
       });
     }
 
@@ -126,10 +125,10 @@ export default function VehiclesPage() {
                 <tbody>
                   {vehicles.map((vehicle) => (
                     <tr key={vehicle.id} className="border-b hover:bg-slate-50">
-                      <td className="py-3 px-4 font-medium">{vehicle.plateNumber}</td>
+                      <td className="py-3 px-4 font-medium">{vehicle.plate_number}</td>
                       <td className="py-3 px-4">{vehicle.model}</td>
-                      <td className="py-3 px-4">{vehicle.fuelType}</td>
-                      <td className="py-3 px-4">{vehicle.expectedEfficiency} km/L</td>
+                      <td className="py-3 px-4">{vehicle.fuel_type}</td>
+                      <td className="py-3 px-4">{vehicle.expected_efficiency} km/L</td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex justify-end gap-2">
                           <Button
