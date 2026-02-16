@@ -45,7 +45,7 @@ interface FleetContextType {
 const FleetContext = createContext<FleetContextType | undefined>(undefined);
 
 export function FleetProvider({ children }: { children: ReactNode }) {
-  const { userProfile } = useAuth();
+  const { userProfile, companySettings } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,9 +141,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const lateEntry = diffDays > 7;
 
+    const warningThreshold = companySettings?.warning_threshold ?? 10;
+    const highRiskThreshold = companySettings?.high_risk_threshold ?? 15;
+
     let riskStatus: "normal" | "warning" | "high" = "normal";
-    if (deviation > 15) riskStatus = "high";
-    else if (deviation > 10) riskStatus = "warning";
+    if (deviation > highRiskThreshold) riskStatus = "high";
+    else if (deviation > warningThreshold) riskStatus = "warning";
 
     await supabase.from("fuel_logs").insert({
       ...log,
